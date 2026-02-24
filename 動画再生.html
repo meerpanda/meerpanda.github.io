@@ -1,0 +1,378 @@
+<!DOCTYPE html>
+<html lang="ja">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Rewind Player Pro</title>
+    <style>
+        :root {
+            --bg-color: #0a0a0a;
+            --accent-color: #ffffff;
+            --primary-color: #007AFF;
+            --glass-bg: rgba(255, 255, 255, 0.08);
+            --glass-border: rgba(255, 255, 255, 0.15);
+            --card-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.8);
+        }
+
+        body,
+        html {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            height: 100dvh;
+            background-color: var(--bg-color);
+            color: var(--accent-color);
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            overflow: hidden;
+            user-select: none;
+            -webkit-user-select: none;
+            -webkit-touch-callout: none;
+            touch-action: none;
+        }
+
+        #app {
+            position: relative;
+            width: 100vw;
+            height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            background: radial-gradient(circle at center, #1a1a1a 0%, #0a0a0a 100%);
+        }
+
+        video {
+            max-width: 100%;
+            max-height: 100%;
+            object-fit: contain;
+            display: none;
+            box-shadow: 0 0 100px rgba(0, 0, 0, 0.5);
+        }
+
+        #overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            background: rgba(0, 0, 0, 0.7);
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+            z-index: 100;
+            transition: all 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .upload-card {
+            padding: 2.5rem 3.5rem;
+            background: var(--glass-bg);
+            border: 1px solid var(--glass-border);
+            border-radius: 24px;
+            text-align: center;
+            box-shadow: var(--card-shadow);
+            max-width: 400px;
+            width: 80%;
+        }
+
+        .upload-card h1 {
+            font-size: 1.8rem;
+            font-weight: 700;
+            letter-spacing: -0.02em;
+            margin-bottom: 0.5rem;
+            background: linear-gradient(135deg, #fff 0%, #888 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .upload-card p {
+            font-size: 0.95rem;
+            opacity: 0.7;
+            margin-bottom: 2rem;
+        }
+
+        /* Mode Selector Styling */
+        .mode-selector {
+            display: flex;
+            background: rgba(0, 0, 0, 0.4);
+            padding: 4px;
+            border-radius: 12px;
+            margin-bottom: 2rem;
+            border: 1px solid var(--glass-border);
+        }
+
+        .mode-btn {
+            flex: 1;
+            padding: 10px 15px;
+            border: none;
+            background: transparent;
+            color: white;
+            font-size: 0.85rem;
+            font-weight: 500;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            opacity: 0.6;
+        }
+
+        .mode-btn.active {
+            background: var(--primary-color);
+            opacity: 1;
+            box-shadow: 0 4px 12px rgba(0, 122, 255, 0.3);
+        }
+
+        .upload-btn {
+            background: var(--accent-color);
+            color: #000;
+            padding: 12px 24px;
+            border-radius: 12px;
+            font-weight: 600;
+            font-size: 1rem;
+            cursor: pointer;
+            transition: transform 0.2s ease;
+            display: inline-block;
+        }
+
+        .upload-btn:active {
+            transform: scale(0.96);
+        }
+
+        #file-input {
+            display: none;
+        }
+
+        .status-indicator {
+            position: absolute;
+            bottom: 40px;
+            left: 40px;
+            font-size: 0.75rem;
+            font-weight: 800;
+            text-transform: uppercase;
+            letter-spacing: 0.2em;
+            opacity: 0;
+            pointer-events: none;
+            background: var(--glass-bg);
+            padding: 6px 12px;
+            border-radius: 6px;
+            border: 1px solid var(--glass-border);
+            transition: opacity 0.3s ease;
+        }
+
+        .hint {
+            position: absolute;
+            top: 40px;
+            width: 100%;
+            text-align: center;
+            font-size: 0.7rem;
+            opacity: 0;
+            letter-spacing: 0.3em;
+            text-transform: uppercase;
+            transition: opacity 0.3s ease;
+            pointer-events: none;
+        }
+
+        body.ready .status-indicator,
+        body.ready .hint {
+            opacity: 0.6;
+        }
+
+        /* Forward state colors */
+        body.is-forward .status-indicator {
+            color: #52ff58;
+            border-color: rgba(82, 255, 88, 0.3);
+            opacity: 1;
+        }
+    </style>
+</head>
+
+<body>
+
+    <div id="app">
+        <video id="player" playsinline preload="auto"></video>
+
+        <div id="overlay">
+            <div class="upload-card">
+                <h1>REWIND PLAYER</h1>
+                <p>再生モードを選択して動画をアップロード</p>
+
+                <div class="mode-selector">
+                    <button class="mode-btn active" data-mode="hold">長押しモード</button>
+                    <button class="mode-btn" data-mode="tap">連打モード</button>
+                </div>
+
+                <div class="upload-btn" id="drop-zone">動画を読み込む</div>
+            </div>
+        </div>
+
+        <div class="status-indicator" id="status">BUFFERING</div>
+        <div class="hint" id="hint">HOLD TO PLAY</div>
+
+        <input type="file" id="file-input" accept="video/*">
+    </div>
+
+    <script>
+        const player = document.getElementById('player');
+        const fileInput = document.getElementById('file-input');
+        const overlay = document.getElementById('overlay');
+        const dropZone = document.getElementById('drop-zone');
+        const status = document.getElementById('status');
+        const hint = document.getElementById('hint');
+        const body = document.body;
+        const modeButtons = document.querySelectorAll('.mode-btn');
+
+        let currentMode = 'hold'; // 'hold' or 'tap'
+        let isForward = false;
+        let requestID = null;
+        let lastTime = 0;
+
+        // --- Mode Selection ---
+        modeButtons.forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                modeButtons.forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+                currentMode = btn.dataset.mode;
+
+                // Update hint text based on mode
+                if (currentMode === 'hold') {
+                    hint.textContent = 'HOLD TO PLAY FORWARD';
+                } else {
+                    hint.textContent = 'TAP TO PLAY / RESTART';
+                }
+            });
+        });
+
+        // --- File Handling ---
+        dropZone.addEventListener('click', () => fileInput.click());
+
+        fileInput.addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (file) loadVideo(file);
+        });
+
+        window.addEventListener('dragover', (e) => { e.preventDefault(); });
+        window.addEventListener('drop', (e) => {
+            e.preventDefault();
+            const file = e.dataTransfer.files[0];
+            if (file && file.type.startsWith('video/')) loadVideo(file);
+        });
+
+        function loadVideo(file) {
+            const url = URL.createObjectURL(file);
+            player.src = url;
+            player.load();
+
+            player.onloadedmetadata = () => {
+                overlay.style.opacity = '0';
+                setTimeout(() => {
+                    overlay.style.display = 'none';
+                    player.style.display = 'block';
+                    body.classList.add('ready');
+
+                    if (currentMode === 'hold') {
+                        status.textContent = 'REWIND';
+                        startReverseLoop();
+                    } else {
+                        status.textContent = 'TAP MODE';
+                        player.currentTime = 0;
+                        player.pause();
+                    }
+
+                    player.muted = true;
+                    lastTime = performance.now();
+                }, 500);
+            };
+        }
+
+        // --- Playback Logic ---
+
+        function startReverseLoop() {
+            if (currentMode !== 'hold') return;
+            isForward = false;
+            player.pause();
+            player.muted = true;
+            body.classList.remove('is-forward');
+            status.textContent = 'REWIND';
+
+            if (requestID) cancelAnimationFrame(requestID);
+            lastTime = performance.now();
+            requestID = requestAnimationFrame(reverseStep);
+        }
+
+        function reverseStep(timestamp) {
+            if (isForward || currentMode !== 'hold') return;
+
+            const deltaTime = (timestamp - lastTime) / 1000;
+            lastTime = timestamp;
+
+            let nextTime = player.currentTime - deltaTime;
+
+            if (nextTime <= 0) {
+                nextTime = 0;
+                player.currentTime = nextTime;
+                cancelAnimationFrame(requestID);
+                requestID = null;
+                return;
+            }
+
+            player.currentTime = nextTime;
+            requestID = requestAnimationFrame(reverseStep);
+        }
+
+        function handlePointerDown() {
+            if (!body.classList.contains('ready')) return;
+
+            if (currentMode === 'hold') {
+                isForward = true;
+                body.classList.add('is-forward');
+                status.textContent = 'FORWARD';
+                if (requestID) cancelAnimationFrame(requestID);
+
+                player.muted = false;
+                player.playbackRate = 1.0;
+                player.play().catch(err => console.log("Play failed:", err));
+            } else {
+                // Rapid-tap mode
+                player.currentTime = 0;
+                player.muted = false;
+                player.play().catch(err => console.log("Play failed:", err));
+                body.classList.add('is-forward');
+                status.textContent = 'PLAYING';
+            }
+        }
+
+        function handlePointerUp() {
+            if (currentMode === 'hold') {
+                if (!isForward) return;
+                startReverseLoop();
+            }
+            // Tap mode doesn't stop on pointer up
+        }
+
+        // --- Interaction Events ---
+        window.addEventListener('pointerdown', handlePointerDown);
+        window.addEventListener('pointerup', handlePointerUp);
+        window.addEventListener('pointerleave', handlePointerUp);
+        window.addEventListener('pointercancel', handlePointerUp);
+
+        // Reset state on video end in Tap mode
+        player.addEventListener('ended', () => {
+            if (currentMode === 'tap') {
+                body.classList.remove('is-forward');
+                status.textContent = 'ENDED';
+                player.currentTime = 0; // Reset to start
+            }
+        });
+
+        // Prevent default touch behaviors
+        window.addEventListener('touchstart', (e) => {
+            if (body.classList.contains('ready')) e.preventDefault();
+        }, { passive: false });
+
+    </script>
+</body>
+
+</html>
